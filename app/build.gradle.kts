@@ -4,14 +4,14 @@ plugins {
 }
 
 android {
-    namespace = "com.example.cocinacapital"
+    namespace = "cl.DSY1105.cocinacapital"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.cocinacapital"
-        minSdk = 24
+        applicationId = "cl.DSY1105.cocinacapital"
+        minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
