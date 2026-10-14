@@ -2,10 +2,14 @@ package cl.DSY1105.cocinacapital.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val AzulOceano = Color(0xFF2F6FA8)
+val AzulBebe = Color(0xFFD4E9FA)
+val VerdeMenta = Color(0xFFCDEFD9)
+val VerdePistacho = Color(0xFFE2F2CF)
+val AzulNube = Color(0xFFF1F7FD)
+val AzulMarino = Color(0xFF1E3448)
+val GrisAzulado = Color(0xFF8DBFEA)
+val BordeMedio = Color(0xFF8AA0B3)
+val BordeSuave = Color(0xFFD5E2EC)
+val Blanco = Color(0xFFFFFFFF)
+val RojoError = Color(0xFFB3261E)
