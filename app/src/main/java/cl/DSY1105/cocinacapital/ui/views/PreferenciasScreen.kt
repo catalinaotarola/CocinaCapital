@@ -32,8 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import cl.DSY1105.cocinacapital.datamodel.OpcionesPreferencias
-import cl.DSY1105.cocinacapital.datamodel.Preferencias
+import cl.DSY1105.cocinacapital.data.model.OpcionesPreferencias
+import cl.DSY1105.cocinacapital.data.model.Preferencias
 import cl.DSY1105.cocinacapital.navigation.Rutas
 import cl.DSY1105.cocinacapital.viewmodel.AuthViewModel
 import kotlin.math.roundToInt

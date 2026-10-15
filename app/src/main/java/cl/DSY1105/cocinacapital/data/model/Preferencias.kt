@@ -1,4 +1,4 @@
-package cl.DSY1105.cocinacapital.datamodel
+package cl.DSY1105.cocinacapital.data.model
 
 data class Preferencias(
     val categorias: Set<String> = emptySet(),
