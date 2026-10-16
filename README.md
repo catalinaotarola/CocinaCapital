@@ -1,5 +1,5 @@
 # CocinaCapital
-Aplicacion Android que conecta a personas con prommociones gastronomicas de restaurantes de la Region de Valparaiso centra en Concon, su funcionamiento es recomendar promociones segun los gustos, la localidad y las fechas especiales de cada user, entrega cupones con su codigo QR y permite a los locales validar esos cupones desde un panel propio.
+Aplicacion Android que conecta a personas con promociones gastronomicas de restaurantes de la Region de Valparaiso centrada en Concon, su funcionamiento es recomendar promociones segun los gustos, la localidad y las fechas especiales de cada user, entrega cupones con su codigo QR y permite a los locales validar esos cupones desde un panel propio.
 
 # Proyecto para la asignatura DSY1105 Desarrollo de Aplicaciones Moviles. 
 
