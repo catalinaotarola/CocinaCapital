@@ -31,6 +31,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -134,7 +139,11 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel) {
                 modifier = Modifier.align(Alignment.End)
             ) { Text("¿Olvidaste tu contraseña?") }
 
-            if (error.isNotEmpty()) {
+            AnimatedVisibility(
+                visible = error.isNotEmpty(),
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
                 Text(error, color = MaterialTheme.colorScheme.error)
             }
 

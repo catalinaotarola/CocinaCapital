@@ -41,6 +41,9 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -94,6 +98,11 @@ fun DetalleScreen(
         return
     }
     val esFavorito = localId in favoritos
+    val escalaCorazon by animateFloatAsState(
+        targetValue = if (esFavorito) 1.3f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow),
+        label = "corazon"
+    )
     val promosDelLocal = promociones.filter { it.localId == localId && catalogoViewModel.estaDisponible(it) }
     val coloresBoton = IconButtonDefaults.filledIconButtonColors(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -134,7 +143,8 @@ fun DetalleScreen(
                         ) {
                             Icon(
                                 imageVector = if (esFavorito) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = if (esFavorito) "Quitar de favoritos" else "Agregar a favoritos"
+                                contentDescription = if (esFavorito) "Quitar de favoritos" else "Agregar a favoritos",
+                                modifier = Modifier.scale(escalaCorazon)
                             )
                         }
                     }

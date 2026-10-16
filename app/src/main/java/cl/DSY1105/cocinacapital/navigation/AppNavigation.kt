@@ -1,5 +1,10 @@
 package cl.DSY1105.cocinacapital.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,7 +57,14 @@ fun AppNavigation(navController: NavHostController) {
         if (authViewModel.usuarioActual != null) Rutas.INICIO else Rutas.LOGIN
     }
 
-    NavHost(navController = navController, startDestination = rutaInicial) {
+    NavHost(
+        navController = navController,
+        startDestination = rutaInicial,
+        enterTransition = { fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 4 } },
+        exitTransition = { fadeOut(tween(300)) },
+        popEnterTransition = { fadeIn(tween(300)) },
+        popExitTransition = { fadeOut(tween(300)) + slideOutHorizontally(tween(300)) { it / 4 } }
+    ) {
         composable(Rutas.LOGIN) { LoginScreen(navController, authViewModel) }
         composable(Rutas.REGISTRO) { RegistroScreen(navController, authViewModel) }
         composable(Rutas.PREFERENCIAS) { PreferenciasScreen(navController, authViewModel) }
