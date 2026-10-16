@@ -13,6 +13,7 @@ import cl.DSY1105.cocinacapital.data.model.Promocion
 import cl.DSY1105.cocinacapital.data.model.Usuario
 import cl.DSY1105.cocinacapital.data.repository.CocinaRepository
 import cl.DSY1105.cocinacapital.data.repository.DatosRecomendacion
+import cl.DSY1105.cocinacapital.utils.Recomendador
 import cl.DSY1105.cocinacapital.utils.Reglas
 import cl.DSY1105.cocinacapital.utils.distanciaKm
 import cl.DSY1105.cocinacapital.utils.estaVencida
@@ -130,9 +131,17 @@ class CatalogoViewModel(app: Application) : AndroidViewModel(app) {
             .sortedWith(compareByDescending<TarjetaPromo> { it.puntaje }.thenBy { it.distanciaKm })
     }
 
-    fun puntaje(usuario: Usuario?, promo: Promocion, local: Local): Int = 0
+    fun puntaje(usuario: Usuario?, promo: Promocion, local: Local): Int =
+        Recomendador.puntaje(usuario, promo, local, distanciaA(local), datosUsuario)
 
-    fun sugerencia(usuario: Usuario?, tarjetas: List<TarjetaPromo>): Sugerencia? = null
+    fun sugerencia(usuario: Usuario?, tarjetas: List<TarjetaPromo>): Sugerencia? {
+        if (usuario == null) return null
+        val (fecha, dias) = Recomendador.fechasCercanas(datosUsuario.fechas).firstOrNull() ?: return null
+        val opciones = tarjetas
+            .filter { Recomendador.calzaConOcasion(it.promocion, fecha.ocasion) }
+            .take(3)
+        return if (opciones.isEmpty()) null else Sugerencia(fecha, dias, opciones)
+    }
 
     fun localesCercanos(
         locales: List<Local>,

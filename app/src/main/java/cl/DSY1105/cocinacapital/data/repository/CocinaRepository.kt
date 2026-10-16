@@ -11,6 +11,7 @@ import cl.DSY1105.cocinacapital.data.model.Favorito
 import cl.DSY1105.cocinacapital.data.model.Local
 import cl.DSY1105.cocinacapital.data.model.Promocion
 import cl.DSY1105.cocinacapital.data.model.Usuario
+import cl.DSY1105.cocinacapital.data.remote.ClienteApi
 import cl.DSY1105.cocinacapital.data.room.AppDatabase
 import cl.DSY1105.cocinacapital.utils.Reglas
 import cl.DSY1105.cocinacapital.utils.estaVencida
@@ -70,7 +71,23 @@ class CocinaRepository(context: Context) {
 
     suspend fun sincronizarCatalogo(): String? {
         if (!Reglas.USAR_BACKEND) return null
-        return null
+        return try {
+            val locales = ClienteApi.servicio.locales()
+            val promociones = ClienteApi.servicio.promociones()
+            catalogoDao.insertarLocales(locales)
+            catalogoDao.insertarPromociones(promociones)
+            null
+        } catch (e: Exception) {
+            "Sin conexión con el servidor. Te mostramos las promociones guardadas en tu teléfono."
+        }
+    }
+
+    suspend fun pedirRecuperacion(correo: String) {
+        if (!Reglas.USAR_BACKEND) return
+        try {
+            ClienteApi.servicio.recuperarClave(mapOf("correo" to correo))
+        } catch (e: Exception) {
+        }
     }
 
     fun favoritosDe(correo: String): Flow<List<Int>> = actividadDao.favoritosDe(correo)

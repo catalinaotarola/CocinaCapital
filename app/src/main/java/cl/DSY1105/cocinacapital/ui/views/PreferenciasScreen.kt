@@ -48,8 +48,12 @@ fun PreferenciasScreen(navController: NavController, authViewModel: AuthViewMode
     var radioKm by remember { mutableFloatStateOf(guardadas.radioKm.toFloat()) }
 
     fun irAInicio() {
-        navController.navigate(Rutas.INICIO) {
-            popUpTo(Rutas.PREFERENCIAS) { inclusive = true }
+        if (navController.previousBackStackEntry != null) {
+            navController.popBackStack()
+        } else {
+            navController.navigate(Rutas.INICIO) {
+                popUpTo(Rutas.PREFERENCIAS) { inclusive = true }
+            }
         }
     }
 
@@ -126,7 +130,7 @@ fun PreferenciasScreen(navController: NavController, authViewModel: AuthViewMode
     }
 }
 
-// Componente reutilizable: una fila de chips que salta de línea si no cabe
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GrupoDeChips(

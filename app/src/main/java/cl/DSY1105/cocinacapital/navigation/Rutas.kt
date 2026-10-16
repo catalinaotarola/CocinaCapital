@@ -15,7 +15,9 @@ object Rutas {
 
     const val DETALLE = "detalle/{localId}"
     const val CUPON = "cupon/{cuponId}"
+    const val PROMOCION_FORM = "promocion_form/{promocionId}"
 
     fun detalle(localId: Int) = "detalle/$localId"
     fun cupon(cuponId: Long) = "cupon/$cuponId"
+    fun promocionForm(promocionId: Int) = "promocion_form/$promocionId"
 }
