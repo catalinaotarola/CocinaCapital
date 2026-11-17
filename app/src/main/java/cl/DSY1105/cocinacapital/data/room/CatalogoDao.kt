@@ -17,6 +17,9 @@ interface CatalogoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarPromociones(promociones: List<Promocion>)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertarPromocionesNuevas(promociones: List<Promocion>): List<Long>
+
     @Insert
     suspend fun insertarPromocion(promocion: Promocion)
 

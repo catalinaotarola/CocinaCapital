@@ -30,10 +30,10 @@ class CuponesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun estadoVisible(cupon: Cupon, promo: Promocion?): EstadoCupon =
-        if (cupon.estado == EstadoCupon.ACTIVO && promo != null && estaVencida(promo.fechaTermino)) {
-            EstadoCupon.VENCIDO
-        } else {
-            cupon.estado
-        }
+    fun estadoVisible(cupon: Cupon, promo: Promocion?): EstadoCupon {
+        if (cupon.estado != EstadoCupon.ACTIVO) return cupon.estado
+        val reservaVencida = System.currentTimeMillis() > cupon.venceReserva
+        val promoVencida = promo != null && estaVencida(promo.fechaTermino)
+        return if (reservaVencida || promoVencida) EstadoCupon.VENCIDO else EstadoCupon.ACTIVO
+    }
 }

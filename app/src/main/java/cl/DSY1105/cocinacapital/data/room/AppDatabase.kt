@@ -18,7 +18,7 @@ import cl.DSY1105.cocinacapital.data.model.Usuario
         Usuario::class, Local::class, Promocion::class, Cupon::class,
         FechaEspecial::class, Favorito::class, Actividad::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Convertidores::class)

@@ -14,5 +14,6 @@ data class Local(
     val longitud: Double,
     val horario: String,
     val nivelPrecio: String,
-    val menuDestacado: String
+    val menuDestacado: String,
+    val correo: String
 )

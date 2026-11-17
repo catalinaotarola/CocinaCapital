@@ -34,9 +34,11 @@ import cl.DSY1105.cocinacapital.ui.views.RecuperarScreen
 import cl.DSY1105.cocinacapital.ui.views.RegistroScreen
 import cl.DSY1105.cocinacapital.viewmodel.AuthViewModel
 import cl.DSY1105.cocinacapital.viewmodel.CatalogoViewModel
+import cl.DSY1105.cocinacapital.viewmodel.ClimaViewModel
 import cl.DSY1105.cocinacapital.viewmodel.CuponesViewModel
 import cl.DSY1105.cocinacapital.viewmodel.PanelViewModel
 import cl.DSY1105.cocinacapital.viewmodel.PerfilViewModel
+import cl.DSY1105.cocinacapital.viewmodel.ResenasViewModel
 
 @Composable
 fun AppNavigation(navController: NavHostController) {
@@ -45,6 +47,8 @@ fun AppNavigation(navController: NavHostController) {
     val cuponesViewModel: CuponesViewModel = viewModel()
     val perfilViewModel: PerfilViewModel = viewModel()
     val panelViewModel: PanelViewModel = viewModel()
+    val climaViewModel: ClimaViewModel = viewModel()
+    val resenasViewModel: ResenasViewModel = viewModel()
 
     if (!authViewModel.listo) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -71,7 +75,7 @@ fun AppNavigation(navController: NavHostController) {
         composable(Rutas.POLITICA) { PoliticaScreen(navController) }
         composable(Rutas.RECUPERAR) { RecuperarScreen(navController, authViewModel) }
 
-        composable(Rutas.INICIO) { InicioScreen(navController, authViewModel, catalogoViewModel) }
+        composable(Rutas.INICIO) { InicioScreen(navController, authViewModel, catalogoViewModel, climaViewModel, resenasViewModel) }
         composable(Rutas.CERCA) { CercaScreen(navController, authViewModel, catalogoViewModel) }
         composable(Rutas.CUPONES) { CuponesScreen(navController, authViewModel, catalogoViewModel, cuponesViewModel) }
         composable(Rutas.PERFIL) { PerfilScreen(navController, authViewModel, perfilViewModel) }
@@ -81,7 +85,7 @@ fun AppNavigation(navController: NavHostController) {
             arguments = listOf(navArgument("localId") { type = NavType.IntType })
         ) { entrada ->
             val localId = entrada.arguments?.getInt("localId") ?: 0
-            DetalleScreen(navController, localId, authViewModel, catalogoViewModel, cuponesViewModel)
+            DetalleScreen(navController, localId, authViewModel, catalogoViewModel, cuponesViewModel, resenasViewModel)
         }
         composable(
             route = Rutas.CUPON,

@@ -10,11 +10,13 @@ data class Promocion(
     val titulo: String,
     val etiqueta: String,
     val condiciones: String,
+    val dias: String,
     val horaInicio: Int,
     val horaFin: Int,
     val fechaTermino: String,
     val cuposTotales: Int,
     val cuposDisponibles: Int,
+    val precioTicket: Int,
     val bajaDemanda: Boolean,
     val ocasion: Ocasion,
     val activa: Boolean = true

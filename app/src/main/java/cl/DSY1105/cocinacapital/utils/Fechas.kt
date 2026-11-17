@@ -25,6 +25,8 @@ fun estaVencida(fechaTermino: String): Boolean = LocalDate.now().isAfter(LocalDa
 
 fun esHoy(fechaIso: String): Boolean = LocalDate.parse(fechaIso) == LocalDate.now()
 
+fun esFechaValida(fechaIso: String): Boolean = runCatching { LocalDate.parse(fechaIso) }.isSuccess
+
 fun formatearFecha(fechaIso: String): String {
     val f = LocalDate.parse(fechaIso)
     return "%02d/%02d/%d".format(f.dayOfMonth, f.monthValue, f.year)
@@ -34,6 +36,17 @@ fun formatearMillis(millis: Long): String {
     val f = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
     return "%02d/%02d/%d".format(f.dayOfMonth, f.monthValue, f.year)
 }
+
+fun formatearFechaHora(millis: Long): String {
+    val f = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
+    return "%02d/%02d a las %02d:%02d".format(f.dayOfMonth, f.monthValue, f.hour, f.minute)
+}
+
+fun finDelDia(fechaIso: String): Long =
+    LocalDate.parse(fechaIso).plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
+
+fun calcularVenceReserva(ahora: Long, horas: Int, fechaTermino: String): Long =
+    minOf(ahora + horas * 60L * 60 * 1000, finDelDia(fechaTermino))
 
 fun textoDiaMes(dia: Int, mes: Int): String = "$dia de ${MESES[mes - 1]}"
 

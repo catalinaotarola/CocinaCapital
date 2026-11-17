@@ -1,14 +1,19 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
 
+val archivoFirma = rootProject.file("keystore.properties")
+val firma = Properties().apply {
+    if (archivoFirma.exists()) archivoFirma.inputStream().use { load(it) }
+}
+
 android {
     namespace = "cl.DSY1105.cocinacapital"
-    compileSdk {
-        version = release(37)
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "cl.DSY1105.cocinacapital"
@@ -20,12 +25,27 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildTypes {
-        release {
-            optimization {
-                enable = false
+    signingConfigs {
+        create("release") {
+            if (archivoFirma.exists()) {
+                storeFile = rootProject.file(firma.getProperty("storeFile"))
+                storePassword = firma.getProperty("storePassword")
+                keyAlias = firma.getProperty("keyAlias")
+                keyPassword = firma.getProperty("keyPassword")
             }
         }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            if (archivoFirma.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -59,7 +79,10 @@ dependencies {
     implementation(libs.zxing.android.embedded)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.logging)
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -92,10 +92,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         return when {
             correoLimpio.isBlank() -> ResultadoAuth.Error("Ingresa tu correo.")
             !esCorreoValido(correoLimpio) -> ResultadoAuth.Error("El correo no tiene un formato válido.")
-            else -> {
-                viewModelScope.launch { repo.pedirRecuperacion(correoLimpio) }
-                ResultadoAuth.Exito
-            }
+            else -> ResultadoAuth.Exito
         }
     }
 

@@ -44,25 +44,47 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import cl.DSY1105.cocinacapital.navigation.Rutas
 import cl.DSY1105.cocinacapital.ui.components.BarraInferior
+import cl.DSY1105.cocinacapital.ui.components.SeccionDestacados
+import cl.DSY1105.cocinacapital.ui.components.TarjetaClima
 import cl.DSY1105.cocinacapital.ui.components.TarjetaPromocion
+import cl.DSY1105.cocinacapital.utils.Incentivos
 import cl.DSY1105.cocinacapital.utils.textoCuando
 import cl.DSY1105.cocinacapital.viewmodel.AuthViewModel
 import cl.DSY1105.cocinacapital.viewmodel.CatalogoViewModel
+import cl.DSY1105.cocinacapital.viewmodel.ClimaViewModel
+import cl.DSY1105.cocinacapital.viewmodel.ResenasViewModel
 import cl.DSY1105.cocinacapital.viewmodel.Sugerencia
 
 @Composable
 fun InicioScreen(
     navController: NavController,
     authViewModel: AuthViewModel,
-    catalogoViewModel: CatalogoViewModel
+    catalogoViewModel: CatalogoViewModel,
+    climaViewModel: ClimaViewModel,
+    resenasViewModel: ResenasViewModel
 ) {
     val usuario = authViewModel.usuarioActual
     val locales by catalogoViewModel.locales.collectAsState()
     val promociones by catalogoViewModel.promociones.collectAsState()
+    val estadoClima by climaViewModel.estado.collectAsState()
+    val estadoDestacados by resenasViewModel.destacados.collectAsState()
     val foco = LocalFocusManager.current
 
     LaunchedEffect(usuario?.correo) {
         usuario?.let { catalogoViewModel.refrescarDatosUsuario(it.correo) }
+    }
+
+    LaunchedEffect(catalogoViewModel.latitud, catalogoViewModel.longitud) {
+        climaViewModel.cargar(catalogoViewModel.latitud, catalogoViewModel.longitud)
+    }
+
+    LaunchedEffect(catalogoViewModel.latitud, catalogoViewModel.longitud, usuario?.preferencias) {
+        resenasViewModel.cargarDestacados(
+            catalogoViewModel.latitud,
+            catalogoViewModel.longitud,
+            usuario?.preferencias?.radioKm ?: 3,
+            usuario?.preferencias?.categorias ?: emptySet()
+        )
     }
 
     val tarjetas = catalogoViewModel.tarjetas(usuario, locales, promociones)
@@ -91,6 +113,10 @@ fun InicioScreen(
                     }
                     Text("Hola, ${usuario?.nombre ?: ""}", style = MaterialTheme.typography.headlineMedium)
                 }
+            }
+
+            item {
+                TarjetaClima(estadoClima) { climaViewModel.reintentar() }
             }
 
             item {
@@ -137,6 +163,14 @@ fun InicioScreen(
                 }
             }
 
+            item {
+                SeccionDestacados(
+                    estado = estadoDestacados,
+                    alElegir = { localId -> navController.navigate(Rutas.detalle(localId)) },
+                    alReintentar = { resenasViewModel.reintentarDestacados() }
+                )
+            }
+
             sugerencia?.let { s ->
                 item {
                     TarjetaSugerencia(s) { localId -> navController.navigate(Rutas.detalle(localId)) }
@@ -180,6 +214,14 @@ private fun TarjetaSugerencia(sugerencia: Sugerencia, alElegir: (Int) -> Unit) {
                 "Tu ${sugerencia.fecha.nombre.lowercase()} ${textoCuando(sugerencia.diasFaltantes)}",
                 style = MaterialTheme.typography.titleMedium
             )
+            val porcentaje = Incentivos.porcentaje(sugerencia.diasFaltantes)
+            if (porcentaje > 0) {
+                Text(
+                    "Reserva anticipada: hasta $porcentaje% de descuento",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Text("Elegimos estos lugares para la ocasión:", style = MaterialTheme.typography.bodyMedium)
             sugerencia.opciones.forEach { opcion ->
                 TextButton(onClick = { alElegir(opcion.local.id) }) {

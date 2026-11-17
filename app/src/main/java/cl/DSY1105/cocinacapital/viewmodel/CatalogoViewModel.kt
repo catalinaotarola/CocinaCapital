@@ -83,7 +83,10 @@ class CatalogoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun sincronizar() {
-        viewModelScope.launch { mensajeConexion = repo.sincronizarCatalogo() }
+        viewModelScope.launch {
+            val resultado = repo.sincronizarCatalogo()
+            mensajeConexion = if (resultado.exito) null else resultado.mensaje
+        }
     }
 
     fun refrescarDatosUsuario(correo: String) {

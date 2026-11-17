@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import cl.DSY1105.cocinacapital.data.repository.CocinaRepository
+import cl.DSY1105.cocinacapital.utils.Incentivos
 import cl.DSY1105.cocinacapital.utils.Recomendador
 import cl.DSY1105.cocinacapital.utils.Reglas
 import cl.DSY1105.cocinacapital.utils.distanciaKm
@@ -37,15 +38,18 @@ class AvisosWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 
         val mensajes = mutableListOf<Pair<String, String>>()
 
-        val cercana = Recomendador.fechasCercanas(datos.fechas).firstOrNull()
+        val cercana = Recomendador.fechasCercanas(datos.fechas)
+            .firstOrNull { (_, dias) -> esPrueba || Incentivos.esDiaDeAviso(dias) }
         if (avisos.fechas && cercana != null) {
             val (fecha, dias) = cercana
             val opciones = tarjetas.filter { Recomendador.calzaConOcasion(it.promocion, fecha.ocasion) }.take(2)
             if (opciones.isNotEmpty()) {
                 val lugares = opciones.joinToString(" o ") { "${it.promocion.etiqueta} en ${it.local.nombre}" }
+                val porcentaje = Incentivos.porcentaje(dias)
+                val beneficio = if (porcentaje > 0) "Reserva hoy y obtén hasta $porcentaje% de descuento. " else ""
                 mensajes.add(
-                    "Tu ${fecha.nombre.lowercase()} ${textoCuando(dias)}" to
-                        "Celebra con $lugares. Toca para ver todas las opciones."
+                    "${Incentivos.etapa(dias)}: tu ${fecha.nombre.lowercase()} ${textoCuando(dias)}" to
+                        "${beneficio}Celebra con $lugares."
                 )
             }
         }
@@ -69,8 +73,12 @@ class AvisosWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             mensajes.add("Cocina Capital" to "Por ahora no hay sugerencias nuevas. Revisa qué avisos tienes encendidos en tu perfil.")
         }
 
+        val haceUnaSemana = System.currentTimeMillis() - SIETE_DIAS_EN_MILIS
+        val accionesSemana = datos.actividad.count { it.fecha >= haceUnaSemana }
+        val maximoHoy = Incentivos.maxAvisosPorDia(accionesSemana)
+
         mensajes.forEachIndexed { indice, (titulo, texto) ->
-            if (esPrueba || ajustes.puedeAvisarHoy(Reglas.MAX_AVISOS_POR_DIA)) {
+            if (esPrueba || ajustes.puedeAvisarHoy(maximoHoy)) {
                 val mostrada = Notificador.mostrar(applicationContext, indice + 1, titulo, texto)
                 if (mostrada && !esPrueba) ajustes.contarAviso()
             }
@@ -80,5 +88,6 @@ class AvisosWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     companion object {
         const val ES_PRUEBA = "es_prueba"
+        private const val SIETE_DIAS_EN_MILIS = 7L * 24 * 60 * 60 * 1000
     }
 }

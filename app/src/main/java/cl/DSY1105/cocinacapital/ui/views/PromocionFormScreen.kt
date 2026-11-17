@@ -1,5 +1,6 @@
 package cl.DSY1105.cocinacapital.ui.views
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -43,13 +44,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import cl.DSY1105.cocinacapital.data.model.Ocasion
+import cl.DSY1105.cocinacapital.utils.NOMBRES_DIAS
+import cl.DSY1105.cocinacapital.utils.alternarDia
+import cl.DSY1105.cocinacapital.utils.correoPromocionGuardada
+import cl.DSY1105.cocinacapital.utils.diasElegidos
+import cl.DSY1105.cocinacapital.utils.enviarCorreo
 import cl.DSY1105.cocinacapital.utils.formatearFecha
 import cl.DSY1105.cocinacapital.viewmodel.PanelViewModel
+import cl.DSY1105.cocinacapital.viewmodel.ResultadoPromocion
 import java.time.Instant
 import java.time.ZoneOffset
 
@@ -57,16 +65,19 @@ import java.time.ZoneOffset
 @Composable
 fun PromocionFormScreen(navController: NavController, promocionId: Int, panelViewModel: PanelViewModel) {
     val promociones by panelViewModel.promociones.collectAsState()
+    val locales by panelViewModel.locales.collectAsState()
     val original = promociones.find { it.id == promocionId }
     val clave = original?.id
+    val contexto = LocalContext.current
 
     var titulo by rememberSaveable(clave) { mutableStateOf(original?.titulo ?: "") }
     var etiqueta by rememberSaveable(clave) { mutableStateOf(original?.etiqueta ?: "") }
-    var condiciones by rememberSaveable(clave) { mutableStateOf(original?.condiciones ?: "") }
+    var dias by rememberSaveable(clave) { mutableStateOf(original?.dias ?: "12345") }
     var horaInicio by rememberSaveable(clave) { mutableStateOf(original?.horaInicio?.toString() ?: "") }
     var horaFin by rememberSaveable(clave) { mutableStateOf(original?.horaFin?.toString() ?: "") }
     var fechaTermino by rememberSaveable(clave) { mutableStateOf(original?.fechaTermino ?: "") }
     var cupos by rememberSaveable(clave) { mutableStateOf(original?.cuposTotales?.toString() ?: "") }
+    var precioTicket by rememberSaveable(clave) { mutableStateOf(original?.precioTicket?.toString() ?: "") }
     var ocasion by rememberSaveable(clave) { mutableStateOf(original?.ocasion ?: Ocasion.CUALQUIERA) }
     var bajaDemanda by rememberSaveable(clave) { mutableStateOf(original?.bajaDemanda ?: true) }
     var error by remember { mutableStateOf("") }
@@ -106,12 +117,21 @@ fun PromocionFormScreen(navController: NavController, promocionId: Int, panelVie
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
-                value = condiciones, onValueChange = { condiciones = it },
-                label = { Text("Condiciones") },
-                placeholder = { Text("Lun a jue · 15:00 a 18:00") },
-                modifier = Modifier.fillMaxWidth()
-            )
+
+            Text("Días de la semana", style = MaterialTheme.typography.titleMedium)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                NOMBRES_DIAS.forEachIndexed { indice, nombreDia ->
+                    val numero = indice + 1
+                    FilterChip(
+                        selected = numero in diasElegidos(dias),
+                        onClick = { dias = alternarDia(dias, numero) },
+                        label = { Text(nombreDia) }
+                    )
+                }
+            }
 
             Text("Horario válido", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -143,14 +163,30 @@ fun PromocionFormScreen(navController: NavController, promocionId: Int, panelVie
                 Spacer(Modifier.width(8.dp))
                 Text(if (fechaTermino.isBlank()) "Elegir fecha de término" else "Válida hasta el ${formatearFecha(fechaTermino)}")
             }
-            OutlinedTextField(
-                value = cupos,
-                onValueChange = { cupos = it.filter { c -> c.isDigit() }.take(4) },
-                label = { Text("Cupos totales") },
-                placeholder = { Text("30") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = cupos,
+                    onValueChange = { cupos = it.filter { c -> c.isDigit() }.take(4) },
+                    label = { Text("Cupos totales") },
+                    placeholder = { Text("30") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = precioTicket,
+                    onValueChange = { precioTicket = it.filter { c -> c.isDigit() }.take(6) },
+                    label = { Text("Ticket (\$)") },
+                    placeholder = { Text("1990") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Text(
+                "El ticket de prepago debe costar mucho menos que el beneficio que entrega.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Text("Ideal para", style = MaterialTheme.typography.titleMedium)
@@ -184,11 +220,27 @@ fun PromocionFormScreen(navController: NavController, promocionId: Int, panelVie
 
             Button(
                 onClick = {
-                    val problema = panelViewModel.guardarPromocion(
-                        original, titulo, etiqueta, condiciones,
-                        horaInicio, horaFin, fechaTermino, cupos, ocasion, bajaDemanda
+                    val resultado = panelViewModel.guardarPromocion(
+                        original, titulo, etiqueta, dias, horaInicio, horaFin,
+                        fechaTermino, cupos, precioTicket, ocasion, bajaDemanda
                     )
-                    if (problema == null) navController.popBackStack() else error = problema
+                    when (resultado) {
+                        is ResultadoPromocion.Error -> error = resultado.mensaje
+                        is ResultadoPromocion.Guardada -> {
+                            val promo = resultado.promocion
+                            val local = locales.find { it.id == promo.localId }
+                            val abierto = enviarCorreo(
+                                contexto,
+                                local?.correo ?: "",
+                                "Promoción guardada: ${promo.titulo}",
+                                correoPromocionGuardada(local?.nombre ?: "local", promo)
+                            )
+                            if (!abierto) {
+                                Toast.makeText(contexto, "Promoción guardada. No hay una app de correo configurada.", Toast.LENGTH_LONG).show()
+                            }
+                            navController.popBackStack()
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) { Text("Guardar promoción") }

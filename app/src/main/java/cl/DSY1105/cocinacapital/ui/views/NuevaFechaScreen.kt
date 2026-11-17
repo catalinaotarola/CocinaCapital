@@ -1,5 +1,6 @@
 package cl.DSY1105.cocinacapital.ui.views
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -45,15 +46,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import cl.DSY1105.cocinacapital.data.model.Ocasion
-import cl.DSY1105.cocinacapital.utils.diasHasta
+import cl.DSY1105.cocinacapital.utils.Incentivos
+import cl.DSY1105.cocinacapital.utils.correoFechaGuardada
+import cl.DSY1105.cocinacapital.utils.enviarCorreo
 import cl.DSY1105.cocinacapital.utils.textoDiaMes
 import cl.DSY1105.cocinacapital.viewmodel.AuthViewModel
 import cl.DSY1105.cocinacapital.viewmodel.PerfilViewModel
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneOffset
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -63,16 +67,16 @@ fun NuevaFechaScreen(
     authViewModel: AuthViewModel,
     perfilViewModel: PerfilViewModel
 ) {
-    val correo = authViewModel.usuarioActual?.correo ?: ""
+    val usuario = authViewModel.usuarioActual
+    val correo = usuario?.correo ?: ""
+    val contexto = LocalContext.current
     var nombre by rememberSaveable { mutableStateOf("") }
     var ocasion by rememberSaveable { mutableStateOf(Ocasion.PAREJA) }
     var dia by rememberSaveable { mutableIntStateOf(0) }
     var mes by rememberSaveable { mutableIntStateOf(0) }
-    var diasAviso by rememberSaveable { mutableIntStateOf(3) }
     var error by rememberSaveable { mutableStateOf("") }
     var verCalendario by remember { mutableStateOf(false) }
     val estadoCalendario = rememberDatePickerState()
-    val opcionesAviso = listOf(1 to "1 día antes", 3 to "3 días antes", 7 to "1 semana antes")
 
     Scaffold(
         topBar = {
@@ -138,27 +142,28 @@ fun NuevaFechaScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Text("Avísame", style = MaterialTheme.typography.titleMedium)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                opcionesAviso.forEach { (dias, texto) ->
-                    FilterChip(
-                        selected = diasAviso == dias,
-                        onClick = { diasAviso = dias },
-                        label = { Text(texto) }
-                    )
-                }
-            }
-
-            if (dia != 0) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.NotificationsActive, contentDescription = null)
-                        Spacer(Modifier.width(12.dp))
-                        Text(textoVistaPrevia(dia, mes, diasAviso, ocasion))
+                        Spacer(Modifier.width(10.dp))
+                        Text("Así te avisaremos", fontWeight = FontWeight.Bold)
                     }
+                    if (dia == 0) {
+                        Text("15 días antes: hasta 50% · 8 días antes: hasta 35% · 1 día antes: hasta 20%.")
+                    } else {
+                        val avisos = Incentivos.calendario(dia, mes)
+                        if (avisos.isEmpty()) {
+                            Text("La fecha es muy pronto: desde hoy verás sugerencias en Inicio.")
+                        }
+                        avisos.forEach { aviso ->
+                            Text("• ${textoDiaMes(aviso.fecha.dayOfMonth, aviso.fecha.monthValue)}: hasta ${aviso.porcentaje}% de descuento")
+                        }
+                    }
+                    Text(
+                        "Al guardar te enviaremos este calendario por correo.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
 
@@ -168,8 +173,17 @@ fun NuevaFechaScreen(
 
             Button(
                 onClick = {
-                    val problema = perfilViewModel.agregarFecha(correo, nombre, ocasion, dia, mes, diasAviso)
-                    if (problema == null) navController.popBackStack() else error = problema
+                    val problema = perfilViewModel.agregarFecha(correo, nombre, ocasion, dia, mes)
+                    if (problema == null) {
+                        val cuerpo = correoFechaGuardada(usuario?.nombre ?: "", nombre.trim(), ocasion.etiqueta, dia, mes)
+                        val abierto = enviarCorreo(contexto, correo, "Guardamos tu fecha: ${nombre.trim()}", cuerpo)
+                        if (!abierto) {
+                            Toast.makeText(contexto, "Fecha guardada. No hay una app de correo configurada.", Toast.LENGTH_LONG).show()
+                        }
+                        navController.popBackStack()
+                    } else {
+                        error = problema
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) { Text("Guardar fecha") }
@@ -195,21 +209,5 @@ fun NuevaFechaScreen(
         ) {
             DatePicker(state = estadoCalendario)
         }
-    }
-}
-
-private fun textoVistaPrevia(dia: Int, mes: Int, diasAviso: Int, ocasion: Ocasion): String {
-    val faltan = diasHasta(dia, mes)
-    val comoCelebrar = when (ocasion) {
-        Ocasion.PAREJA -> "en pareja"
-        Ocasion.FAMILIAR -> "en familia"
-        Ocasion.AMIGOS -> "con amigos"
-        else -> "tu día"
-    }
-    return if (faltan <= diasAviso) {
-        "La fecha está cerca: desde hoy verás lugares con promociones para celebrar $comoCelebrar."
-    } else {
-        val aviso = LocalDate.now().plusDays(faltan - diasAviso)
-        "El ${textoDiaMes(aviso.dayOfMonth, aviso.monthValue)} te sugeriremos lugares con promociones para celebrar $comoCelebrar."
     }
 }

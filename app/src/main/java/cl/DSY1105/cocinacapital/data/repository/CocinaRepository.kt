@@ -12,17 +12,28 @@ import cl.DSY1105.cocinacapital.data.model.Local
 import cl.DSY1105.cocinacapital.data.model.Promocion
 import cl.DSY1105.cocinacapital.data.model.Usuario
 import cl.DSY1105.cocinacapital.data.remote.ClienteApi
+import cl.DSY1105.cocinacapital.data.remote.dto.aModelo
 import cl.DSY1105.cocinacapital.data.room.AppDatabase
 import cl.DSY1105.cocinacapital.utils.Reglas
+import cl.DSY1105.cocinacapital.utils.aplicaElDia
+import cl.DSY1105.cocinacapital.utils.calcularVenceReserva
 import cl.DSY1105.cocinacapital.utils.estaVencida
 import cl.DSY1105.cocinacapital.utils.formatearFecha
+import cl.DSY1105.cocinacapital.utils.formatearFechaHora
+import cl.DSY1105.cocinacapital.utils.mensajeDeError
+import cl.DSY1105.cocinacapital.utils.textoDias
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalTime
 
 sealed class ResultadoCupon {
     data class Exito(val cupon: Cupon) : ResultadoCupon()
     data class Error(val mensaje: String) : ResultadoCupon()
 }
+
+data class ResultadoSincronizacion(val exito: Boolean, val mensaje: String)
 
 data class DatosRecomendacion(
     val fechas: List<FechaEspecial> = emptyList(),
@@ -41,11 +52,13 @@ class CocinaRepository(context: Context) {
     val ajustes = AjustesManager(context)
 
     suspend fun cargarDatosIniciales() {
-        if (catalogoDao.contarLocales() == 0) {
-            catalogoDao.insertarLocales(DatosDePrueba.locales)
-            catalogoDao.insertarPromociones(DatosDePrueba.promociones)
-            usuarioDao.insertar(DatosDePrueba.usuarioDemo)
-            DatosDePrueba.fechasDemo().forEach { fechaDao.insertar(it) }
+        candado.withLock {
+            if (catalogoDao.contarLocales() == 0) {
+                catalogoDao.insertarLocales(DatosDePrueba.locales)
+                catalogoDao.insertarPromociones(DatosDePrueba.promociones)
+                usuarioDao.insertar(DatosDePrueba.usuarioDemo)
+                DatosDePrueba.fechasDemo().forEach { fechaDao.insertar(it) }
+            }
         }
     }
 
@@ -69,24 +82,32 @@ class CocinaRepository(context: Context) {
     suspend fun crearPromocion(promocion: Promocion) = catalogoDao.insertarPromocion(promocion)
     suspend fun actualizarPromocion(promocion: Promocion) = catalogoDao.actualizarPromocion(promocion)
 
-    suspend fun sincronizarCatalogo(): String? {
-        if (!Reglas.USAR_BACKEND) return null
+    suspend fun sincronizarCatalogo(): ResultadoSincronizacion {
+        cargarDatosIniciales()
+        if (!Reglas.USAR_BACKEND) return ResultadoSincronizacion(true, "Usando solo los datos del teléfono.")
         return try {
-            val locales = ClienteApi.servicio.locales()
-            val promociones = ClienteApi.servicio.promociones()
+            val respuesta = ClienteApi.catalogo.catalogo()
+            val locales = respuesta.locales.orEmpty().mapNotNull { it.aModelo() }
+            val idsAntes = catalogoDao.localesAhora().map { it.id }.toSet()
+            val localesNuevos = locales.count { it.id !in idsAntes }
             catalogoDao.insertarLocales(locales)
-            catalogoDao.insertarPromociones(promociones)
-            null
-        } catch (e: Exception) {
-            "Sin conexión con el servidor. Te mostramos las promociones guardadas en tu teléfono."
-        }
-    }
 
-    suspend fun pedirRecuperacion(correo: String) {
-        if (!Reglas.USAR_BACKEND) return
-        try {
-            ClienteApi.servicio.recuperarClave(mapOf("correo" to correo))
+            val idsLocales = idsAntes + locales.map { it.id }
+            val promociones = respuesta.promociones.orEmpty()
+                .mapNotNull { it.aModelo() }
+                .filter { it.localId in idsLocales }
+            val promocionesNuevas = catalogoDao.insertarPromocionesNuevas(promociones).count { it != -1L }
+
+            val mensaje = if (localesNuevos == 0 && promocionesNuevas == 0) {
+                "Tu catálogo ya está al día."
+            } else {
+                "Catálogo actualizado: $localesNuevos locales y $promocionesNuevas promociones nuevas."
+            }
+            ResultadoSincronizacion(true, mensaje)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            ResultadoSincronizacion(false, "${mensajeDeError(e)} Te mostramos lo guardado en tu teléfono.")
         }
     }
 
@@ -120,17 +141,20 @@ class CocinaRepository(context: Context) {
             return ResultadoCupon.Error("Esta promoción ya no está vigente.")
         }
         if (cuponDao.contarDe(correo, promocionId) > 0) {
-            return ResultadoCupon.Error("Ya obtuviste este beneficio.")
+            return ResultadoCupon.Error("Ya compraste el ticket de esta promoción.")
         }
         if (catalogoDao.descontarCupo(promocionId) == 0) {
             return ResultadoCupon.Error("Se acabaron los cupos de esta promoción.")
         }
+        val ahora = System.currentTimeMillis()
         val nuevo = Cupon(
             correoUsuario = correo,
             promocionId = promocionId,
             localId = promo.localId,
             codigo = generarCodigo(),
-            fechaObtencion = System.currentTimeMillis()
+            precioPagado = promo.precioTicket,
+            fechaObtencion = ahora,
+            venceReserva = calcularVenceReserva(ahora, Reglas.HORAS_RESERVA, promo.fechaTermino)
         )
         val id = cuponDao.insertar(nuevo)
         return ResultadoCupon.Exito(nuevo.copy(id = id))
@@ -149,6 +173,12 @@ class CocinaRepository(context: Context) {
             ?: return ResultadoCupon.Error("La promoción ya no existe.")
         if (estaVencida(promo.fechaTermino)) {
             return ResultadoCupon.Error("Este cupón venció el ${formatearFecha(promo.fechaTermino)}.")
+        }
+        if (System.currentTimeMillis() > cupon.venceReserva) {
+            return ResultadoCupon.Error("La reserva de este cupón venció el ${formatearFechaHora(cupon.venceReserva)}.")
+        }
+        if (Reglas.VALIDAR_HORARIO && !aplicaElDia(promo.dias)) {
+            return ResultadoCupon.Error("Este beneficio solo es válido: ${textoDias(promo.dias)}.")
         }
         val hora = LocalTime.now().hour
         if (Reglas.VALIDAR_HORARIO && hora !in promo.horaInicio until promo.horaFin) {
@@ -174,4 +204,8 @@ class CocinaRepository(context: Context) {
         actividad = actividadDao.actividadDeAhora(correo),
         promocionesObtenidas = cuponDao.cuponesDeAhora(correo).map { it.promocionId }.toSet()
     )
+
+    companion object {
+        private val candado = Mutex()
+    }
 }

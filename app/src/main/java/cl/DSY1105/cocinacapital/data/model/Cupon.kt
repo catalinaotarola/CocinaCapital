@@ -10,7 +10,9 @@ data class Cupon(
     val promocionId: Int,
     val localId: Int,
     val codigo: String,
+    val precioPagado: Int,
     val estado: EstadoCupon = EstadoCupon.ACTIVO,
     val fechaObtencion: Long,
+    val venceReserva: Long,
     val fechaCanje: Long? = null
 )

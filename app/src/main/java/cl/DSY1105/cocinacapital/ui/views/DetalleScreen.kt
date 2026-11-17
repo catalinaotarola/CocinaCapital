@@ -61,14 +61,22 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import cl.DSY1105.cocinacapital.data.model.Ocasion
 import cl.DSY1105.cocinacapital.data.model.Promocion
+import cl.DSY1105.cocinacapital.data.model.Resena
 import cl.DSY1105.cocinacapital.data.repository.ResultadoCupon
 import cl.DSY1105.cocinacapital.navigation.Rutas
+import cl.DSY1105.cocinacapital.ui.components.DialogoResena
+import cl.DSY1105.cocinacapital.ui.components.Estrellas
+import cl.DSY1105.cocinacapital.ui.components.TarjetaResena
 import cl.DSY1105.cocinacapital.ui.components.iconoDeCategoria
+import cl.DSY1105.cocinacapital.viewmodel.UiState
+import cl.DSY1105.cocinacapital.utils.Reglas
 import cl.DSY1105.cocinacapital.utils.formatearFecha
+import cl.DSY1105.cocinacapital.utils.formatearPesos
 import cl.DSY1105.cocinacapital.utils.textoDistancia
 import cl.DSY1105.cocinacapital.viewmodel.AuthViewModel
 import cl.DSY1105.cocinacapital.viewmodel.CatalogoViewModel
 import cl.DSY1105.cocinacapital.viewmodel.CuponesViewModel
+import cl.DSY1105.cocinacapital.viewmodel.ResenasViewModel
 
 @Composable
 fun DetalleScreen(
@@ -76,18 +84,30 @@ fun DetalleScreen(
     localId: Int,
     authViewModel: AuthViewModel,
     catalogoViewModel: CatalogoViewModel,
-    cuponesViewModel: CuponesViewModel
+    cuponesViewModel: CuponesViewModel,
+    resenasViewModel: ResenasViewModel
 ) {
     val correo = authViewModel.usuarioActual?.correo ?: ""
+    val nombreUsuario = authViewModel.usuarioActual?.nombre ?: ""
     val locales by catalogoViewModel.locales.collectAsState()
     val promociones by catalogoViewModel.promociones.collectAsState()
     val favoritos by remember(correo) { catalogoViewModel.favoritosDe(correo) }
         .collectAsState(initial = emptyList())
     var mensaje by remember { mutableStateOf<String?>(null) }
+    var promoAComprar by remember { mutableStateOf<Promocion?>(null) }
+    val estadoResenas by resenasViewModel.resenas.collectAsState()
+    var escribiendoResena by remember { mutableStateOf(false) }
+    var resenaEditando by remember { mutableStateOf<Resena?>(null) }
+    var resenaABorrar by remember { mutableStateOf<Resena?>(null) }
+    var errorResena by remember { mutableStateOf("") }
     val contexto = LocalContext.current
 
     LaunchedEffect(localId) {
         if (correo.isNotEmpty()) catalogoViewModel.registrarVista(correo, localId)
+    }
+
+    LaunchedEffect(localId, correo) {
+        resenasViewModel.cargarResenas(localId, correo)
     }
 
     val local = locales.find { it.id == localId }
@@ -201,17 +221,86 @@ fun DetalleScreen(
                 TarjetaPromoDetalle(
                     promo = promo,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-                    alObtener = {
-                        if (correo.isNotEmpty()) {
-                            cuponesViewModel.obtenerCupon(correo, promo.id) { resultado ->
-                                when (resultado) {
-                                    is ResultadoCupon.Exito -> navController.navigate(Rutas.cupon(resultado.cupon.id))
-                                    is ResultadoCupon.Error -> mensaje = resultado.mensaje
-                                }
-                            }
+                    alObtener = { promoAComprar = promo }
+                )
+            }
+
+            item {
+                val lista = when (val estado = estadoResenas) {
+                    is UiState.Exito -> estado.datos
+                    else -> emptyList()
+                }
+                val mia = lista.find { it.esMia }
+                Column(
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("Reseñas de la comunidad", style = MaterialTheme.typography.titleMedium)
+                    if (lista.isNotEmpty()) {
+                        val promedio = lista.map { it.puntaje }.average()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Estrellas(Math.round(promedio).toInt(), 20.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "${String.format("%.1f", promedio).replace('.', ',')} · ${lista.size} ${if (lista.size == 1) "reseña" else "reseñas"}",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
-                )
+                    if (estadoResenas is UiState.Exito && correo.isNotEmpty()) {
+                        OutlinedButton(onClick = {
+                            errorResena = ""
+                            resenaEditando = mia
+                            escribiendoResena = true
+                        }) {
+                            Text(if (mia == null) "Escribir reseña" else "Editar mi reseña")
+                        }
+                    }
+                }
+            }
+            when (val estado = estadoResenas) {
+                is UiState.Cargando -> item {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Cargando reseñas…")
+                    }
+                }
+                is UiState.Error -> item {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(estado.mensaje, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { resenasViewModel.reintentarResenas() }) { Text("Reintentar") }
+                    }
+                }
+                is UiState.Exito -> {
+                    if (estado.datos.isEmpty()) {
+                        item {
+                            Text(
+                                "Aún no hay reseñas. ¡Sé la primera persona en opinar!",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                    items(estado.datos, key = { "resena-${it.id}" }) { resena ->
+                        TarjetaResena(
+                            resena = resena,
+                            alEditar = {
+                                errorResena = ""
+                                resenaEditando = resena
+                                escribiendoResena = true
+                            },
+                            alEliminar = { resenaABorrar = resena },
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                        )
+                    }
+                }
             }
 
             item {
@@ -236,6 +325,71 @@ fun DetalleScreen(
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
+    }
+
+    promoAComprar?.let { promo ->
+        AlertDialog(
+            onDismissRequest = { promoAComprar = null },
+            icon = { Icon(Icons.Filled.ConfirmationNumber, contentDescription = null) },
+            title = { Text("Comprar ticket de prepago") },
+            text = {
+                Text(
+                    "Pagas ${formatearPesos(promo.precioTicket)} y obtienes: ${promo.titulo}.\n\n" +
+                        "Tu cupón queda reservado por ${Reglas.HORAS_RESERVA} horas y se canjea en el local: " +
+                        "${promo.condiciones}.\n\nPago simulado: este prototipo no realiza cobros reales."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    promoAComprar = null
+                    if (correo.isNotEmpty()) {
+                        cuponesViewModel.obtenerCupon(correo, promo.id) { resultado ->
+                            when (resultado) {
+                                is ResultadoCupon.Exito -> navController.navigate(Rutas.cupon(resultado.cupon.id))
+                                is ResultadoCupon.Error -> mensaje = resultado.mensaje
+                            }
+                        }
+                    }
+                }) { Text("Pagar y reservar") }
+            },
+            dismissButton = { TextButton(onClick = { promoAComprar = null }) { Text("Cancelar") } }
+        )
+    }
+
+    if (escribiendoResena) {
+        DialogoResena(
+            inicial = resenaEditando,
+            enviando = resenasViewModel.enviando,
+            error = errorResena,
+            alGuardar = { puntaje, comentario ->
+                resenasViewModel.guardar(localId, correo, nombreUsuario, resenaEditando, puntaje, comentario) { problema ->
+                    if (problema == null) {
+                        escribiendoResena = false
+                        errorResena = ""
+                    } else {
+                        errorResena = problema
+                    }
+                }
+            },
+            alCerrar = { escribiendoResena = false }
+        )
+    }
+
+    resenaABorrar?.let { resena ->
+        AlertDialog(
+            onDismissRequest = { resenaABorrar = null },
+            title = { Text("¿Eliminar tu reseña?") },
+            text = { Text("Se borrará del servidor y nadie más podrá verla.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    resenaABorrar = null
+                    resenasViewModel.eliminar(resena, correo) { problema ->
+                        if (problema != null) mensaje = problema
+                    }
+                }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { resenaABorrar = null }) { Text("Cancelar") } }
+        )
     }
 
     mensaje?.let { texto ->
@@ -271,9 +425,14 @@ private fun TarjetaPromoDetalle(promo: Promocion, modifier: Modifier = Modifier,
                 Text(promo.condiciones, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                "Valido hasta el ${formatearFecha(promo.fechaTermino)} · 1 cupón por persona",
+                "Válido hasta el ${formatearFecha(promo.fechaTermino)} · 1 cupón por persona",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "Ticket de prepago: ${formatearPesos(promo.precioTicket)} · reserva por ${Reglas.HORAS_RESERVA} horas",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold
             )
             val avance = if (promo.cuposTotales > 0) promo.cuposDisponibles.toFloat() / promo.cuposTotales else 0f
             LinearProgressIndicator(progress = { avance }, modifier = Modifier.fillMaxWidth())
@@ -285,7 +444,7 @@ private fun TarjetaPromoDetalle(promo: Promocion, modifier: Modifier = Modifier,
             Button(onClick = alObtener, modifier = Modifier.fillMaxWidth().height(52.dp)) {
                 Icon(Icons.Filled.ConfirmationNumber, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Obtener cupón")
+                Text("Comprar ticket · ${formatearPesos(promo.precioTicket)}")
             }
         }
     }

@@ -30,8 +30,7 @@ class PerfilViewModel(app: Application) : AndroidViewModel(app) {
         nombre: String,
         ocasion: Ocasion,
         dia: Int,
-        mes: Int,
-        diasAviso: Int
+        mes: Int
     ): String? {
         if (nombre.isBlank()) return "Escribe qué se celebra."
         if (dia == 0 || mes == 0) return "Elige la fecha."
@@ -42,8 +41,7 @@ class PerfilViewModel(app: Application) : AndroidViewModel(app) {
                     nombre = nombre.trim(),
                     ocasion = ocasion,
                     dia = dia,
-                    mes = mes,
-                    diasAviso = diasAviso
+                    mes = mes
                 )
             )
         }

@@ -11,5 +11,5 @@ data class FechaEspecial(
     val ocasion: Ocasion,
     val dia: Int,
     val mes: Int,
-    val diasAviso: Int = 3
+    val diasAviso: Int = 15
 )

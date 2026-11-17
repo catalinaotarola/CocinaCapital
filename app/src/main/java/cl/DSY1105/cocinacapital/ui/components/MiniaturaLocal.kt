@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.LocalPizza
 import androidx.compose.material.icons.filled.LunchDining
 import androidx.compose.material.icons.filled.OutdoorGrill
 import androidx.compose.material.icons.filled.RamenDining
@@ -28,6 +30,8 @@ fun iconoDeCategoria(categoria: String): ImageVector = when (categoria) {
     "Parrilla" -> Icons.Filled.OutdoorGrill
     "Hamburguesas" -> Icons.Filled.LunchDining
     "Vegana" -> Icons.Filled.Eco
+    "Pizza" -> Icons.Filled.LocalPizza
+    "Postres" -> Icons.Filled.Cake
     else -> Icons.Filled.Restaurant
 }
 

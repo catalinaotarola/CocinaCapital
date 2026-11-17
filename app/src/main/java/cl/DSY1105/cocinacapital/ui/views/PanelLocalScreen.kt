@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,9 +23,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -140,6 +143,33 @@ fun PanelLocalScreen(navController: NavController, panelViewModel: PanelViewMode
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Catálogo en la nube", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Descarga los locales y promociones nuevas publicadas por Cocina Capital.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(
+                            onClick = { panelViewModel.actualizarCatalogo() },
+                            enabled = !panelViewModel.sincronizando,
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            if (panelViewModel.sincronizando) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Filled.Refresh, contentDescription = null)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (panelViewModel.sincronizando) "Actualizando…" else "Actualizar catálogo")
+                        }
+                        panelViewModel.mensajeCatalogo?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    }
                 }
             }
 

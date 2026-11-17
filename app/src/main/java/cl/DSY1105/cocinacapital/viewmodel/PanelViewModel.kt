@@ -3,6 +3,7 @@ package cl.DSY1105.cocinacapital.viewmodel
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,12 +13,19 @@ import cl.DSY1105.cocinacapital.data.model.Ocasion
 import cl.DSY1105.cocinacapital.data.model.Promocion
 import cl.DSY1105.cocinacapital.data.repository.CocinaRepository
 import cl.DSY1105.cocinacapital.data.repository.ResultadoCupon
+import cl.DSY1105.cocinacapital.utils.diasElegidos
 import cl.DSY1105.cocinacapital.utils.estaVencida
+import cl.DSY1105.cocinacapital.utils.textoCondiciones
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+sealed class ResultadoPromocion {
+    data class Guardada(val promocion: Promocion) : ResultadoPromocion()
+    data class Error(val mensaje: String) : ResultadoPromocion()
+}
 
 class PanelViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = CocinaRepository(app)
@@ -30,12 +38,26 @@ class PanelViewModel(app: Application) : AndroidViewModel(app) {
     var localId by mutableIntStateOf(1)
         private set
 
+    var sincronizando by mutableStateOf(false)
+        private set
+    var mensajeCatalogo by mutableStateOf<String?>(null)
+        private set
+
     fun elegirLocal(id: Int) {
         localId = id
     }
 
     fun cuponesDelLocal(id: Int): Flow<List<Cupon>> = repo.cuponesDelLocal(id)
     fun vistasDelLocal(id: Int): Flow<Int> = repo.vistasDelLocal(id)
+
+    fun actualizarCatalogo() {
+        if (sincronizando) return
+        sincronizando = true
+        viewModelScope.launch {
+            mensajeCatalogo = repo.sincronizarCatalogo().mensaje
+            sincronizando = false
+        }
+    }
 
     fun validar(codigo: String, alTerminar: (exito: Boolean, mensaje: String) -> Unit) {
         if (codigo.isBlank()) {
@@ -62,26 +84,31 @@ class PanelViewModel(app: Application) : AndroidViewModel(app) {
         original: Promocion?,
         titulo: String,
         etiqueta: String,
-        condiciones: String,
+        dias: String,
         horaInicio: String,
         horaFin: String,
         fechaTermino: String,
         cupos: String,
+        precioTicket: String,
         ocasion: Ocasion,
         bajaDemanda: Boolean
-    ): String? {
-        if (titulo.isBlank() || etiqueta.isBlank() || condiciones.isBlank()) {
-            return "Completa el título, la etiqueta y las condiciones."
+    ): ResultadoPromocion {
+        if (titulo.isBlank() || etiqueta.isBlank()) {
+            return ResultadoPromocion.Error("Completa el título y la etiqueta.")
         }
+        val diasValidos = diasElegidos(dias).joinToString("")
+        if (diasValidos.isEmpty()) return ResultadoPromocion.Error("Elige al menos un día de la semana.")
         val inicio = horaInicio.toIntOrNull()
         val fin = horaFin.toIntOrNull()
         if (inicio == null || fin == null || inicio !in 0..23 || fin !in 1..24 || inicio >= fin) {
-            return "Revisa el horario: las horas van de 0 a 24 y el inicio debe ser antes del fin."
+            return ResultadoPromocion.Error("Revisa el horario: las horas van de 0 a 24 y el inicio debe ser antes del fin.")
         }
-        if (fechaTermino.isBlank()) return "Elige hasta qué día es válida la promoción."
-        if (estaVencida(fechaTermino)) return "La fecha de término no puede estar en el pasado."
+        if (fechaTermino.isBlank()) return ResultadoPromocion.Error("Elige hasta qué día es válida la promoción.")
+        if (estaVencida(fechaTermino)) return ResultadoPromocion.Error("La fecha de término no puede estar en el pasado.")
         val totales = cupos.toIntOrNull()
-        if (totales == null || totales <= 0) return "Los cupos deben ser un número mayor que 0."
+        if (totales == null || totales <= 0) return ResultadoPromocion.Error("Los cupos deben ser un número mayor que 0.")
+        val ticket = precioTicket.toIntOrNull()
+        if (ticket == null || ticket <= 0) return ResultadoPromocion.Error("El ticket de prepago debe costar más de \$0.")
 
         val usados = if (original != null) original.cuposTotales - original.cuposDisponibles else 0
         val promo = Promocion(
@@ -89,12 +116,14 @@ class PanelViewModel(app: Application) : AndroidViewModel(app) {
             localId = original?.localId ?: localId,
             titulo = titulo.trim(),
             etiqueta = etiqueta.trim(),
-            condiciones = condiciones.trim(),
+            condiciones = textoCondiciones(diasValidos, inicio, fin),
+            dias = diasValidos,
             horaInicio = inicio,
             horaFin = fin,
             fechaTermino = fechaTermino,
             cuposTotales = totales,
             cuposDisponibles = (totales - usados).coerceAtLeast(0),
+            precioTicket = ticket,
             bajaDemanda = bajaDemanda,
             ocasion = ocasion,
             activa = original?.activa ?: true
@@ -102,6 +131,6 @@ class PanelViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             if (original == null) repo.crearPromocion(promo) else repo.actualizarPromocion(promo)
         }
-        return null
+        return ResultadoPromocion.Guardada(promo)
     }
 }

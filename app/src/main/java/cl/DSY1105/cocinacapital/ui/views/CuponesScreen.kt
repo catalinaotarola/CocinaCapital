@@ -39,7 +39,7 @@ import cl.DSY1105.cocinacapital.navigation.Rutas
 import cl.DSY1105.cocinacapital.ui.components.BarraInferior
 import cl.DSY1105.cocinacapital.ui.components.MiniaturaLocal
 import cl.DSY1105.cocinacapital.utils.esHoy
-import cl.DSY1105.cocinacapital.utils.formatearFecha
+import cl.DSY1105.cocinacapital.utils.formatearFechaHora
 import cl.DSY1105.cocinacapital.utils.formatearMillis
 import cl.DSY1105.cocinacapital.viewmodel.AuthViewModel
 import cl.DSY1105.cocinacapital.viewmodel.CatalogoViewModel
@@ -116,7 +116,8 @@ fun CuponesScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TarjetaCupon(cupon: Cupon, estado: EstadoCupon, promo: Promocion, local: Local, alTocar: () -> Unit) {
-    val venceHoy = estado == EstadoCupon.ACTIVO && esHoy(promo.fechaTermino)
+    val venceHoy = estado == EstadoCupon.ACTIVO &&
+        (esHoy(promo.fechaTermino) || cupon.venceReserva - System.currentTimeMillis() < 24L * 60 * 60 * 1000)
     OutlinedCard(onClick = alTocar, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -129,16 +130,16 @@ private fun TarjetaCupon(cupon: Cupon, estado: EstadoCupon, promo: Promocion, lo
                 Text(promo.titulo, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 Text(
                     when (estado) {
-                        EstadoCupon.ACTIVO -> "Vence el ${formatearFecha(promo.fechaTermino)}"
+                        EstadoCupon.ACTIVO -> "Reserva hasta el ${formatearFechaHora(cupon.venceReserva)}"
                         EstadoCupon.CANJEADO -> "Usado el ${formatearMillis(cupon.fechaCanje ?: cupon.fechaObtencion)}"
-                        EstadoCupon.VENCIDO -> "Venció el ${formatearFecha(promo.fechaTermino)}"
+                        EstadoCupon.VENCIDO -> "Venció el ${formatearFechaHora(cupon.venceReserva)}"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                if (venceHoy) "Vence hoy" else estado.etiqueta,
+                if (venceHoy) "Vence pronto" else estado.etiqueta,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = if (venceHoy) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
